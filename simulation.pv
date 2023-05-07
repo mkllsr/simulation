@@ -1,0 +1,177 @@
+type point.
+type key.
+free Sec:channel [private].		(*secure channel*)
+free Pub:channel.				(*public channel*)
+(*Names & Variables*)
+const P:point.
+free Ppub:point.
+free IDi:bitstring.
+free idC:bitstring.
+free IDl:bitstring.
+free RCL:bitstring.
+free Xi:point.
+free Ri:point.
+free xi:bitstring [private].
+free di:bitstring [private].
+free s:bitstring [private].
+free K1:point [private].
+(*Constructors, Destructors & Equations*)
+fun H1(bitstring,point,point):bitstring.
+fun H2(bitstring,point,point):bitstring.
+fun H3(point,point,point,bitstring):bitstring.
+fun H4(bitstring):bitstring.
+fun H5(point):bitstring.
+fun XOR(bitstring,bitstring):bitstring.
+fun ADD(bitstring,bitstring):bitstring.
+fun PA(point,point):point.	 (*point addition*)
+fun MULT(bitstring,bitstring):bitstring.(*multiplication*)	
+fun ECPM(bitstring,point):point.(*elliptic curve point multiplication*)
+fun CONCAT(bitstring,bitstring):bitstring.
+fun concat(point,point):point.
+fun Concat(point,bitstring):bitstring.
+fun function(bitstring,bitstring):bitstring.
+equation forall a:bitstring, b:bitstring; XOR(XOR(a,b),b)=a.
+(*Event*)
+event beginVi(bitstring).
+event endVi(bitstring).
+event beginOBU(bitstring).
+event endOBU(bitstring).
+event beginRSU(bitstring).
+event endRSU(bitstring).
+event beginCS(bitstring).
+event endCS(bitstring).
+(*Queries*)
+query attacker(K1).
+query attacker(xi).
+query attacker(di).
+query id:bitstring; inj-event (endVi(id)) ==> inj-event(beginVi(id)).
+query id:bitstring; inj-event (endOBU(id)) ==> inj-event(beginOBU(id)).
+query id:bitstring; inj-event (endRSU(id)) ==> inj-event(beginRSU(id)).
+query id:bitstring; inj-event (endCS(id)) ==> inj-event(beginCS(id)).
+(*Processes*)
+let Vi = 
+	new ai:bitstring;
+	let Si = XOR(IDi,H4(ai)) in
+	out(Sec,(IDi,Si));
+	in(Sec,(di:bitstring,Ri:point));
+	event beginVi(IDi);
+	if ECPM(di,P) = PA(Ri,ECPM(H1(Si,Ri,Ppub),Ppub)) then
+	new xi:bitstring;
+	let Xi = ECPM(xi,P) in
+	let PKi = concat(Xi,Ri) in
+	new FID1i:bitstring;
+	new a1i:bitstring;
+	new FID2i:bitstring;
+	new a2i:bitstring;
+	new FID3i:bitstring;
+	new a3i:bitstring;
+    (*let XOR(FID1i,H4(a1i)) = XOR(IDi,H4(ai)) in
+    let XOR(FID2i,H4(a2i)) = XOR(IDi,H4(ai)) in
+    let XOR(FID3i,H4(a3i)) = XOR(IDi,H4(ai)) in*)
+    out(Pub,(PKi,FID1i,a1i,FID2i,a2i,FID3i,a3i));
+    event endVi(IDi)
+	else 0.
+let KGC =
+	in(Sec,(IDi:bitstring,Si:bitstring));
+	new ri:bitstring;
+	let Ri = ECPM(ri,P) in 
+	let di = ADD(ri,MULT(s,H1(Si,Ri,Ppub))) in
+	out(Sec,(di,Ri));
+	0.
+let OBU1 =
+	in(Pub,(PKi:point,FID1i:bitstring,a1i:bitstring));
+	event beginOBU(idC);
+	new uO1:bitstring;
+	let UO1 = ECPM(uO1,P) in
+	new TO1:bitstring;
+	let MO1 = CONCAT(FID1i,CONCAT(a1i,CONCAT(idC,Concat(UO1,TO1)))) in
+	let h21 = H2(MO1,PKi,UO1) in
+	let h31 = H3(Ppub,PKi,UO1,h21) in
+	let deltaO1 = ADD(MULT(h21,ADD(di,uO1)),MULT(h31,xi)) in
+	out(Pub,(MO1,deltaO1));
+	in(Pub,(PKCl:point,RCl:point,Wl:point,Al:bitstring,deltaCl:bitstring,TCl:bitstring));
+	let h1l = H1(IDl,RCl,Ppub) in 
+	let h2l = H2(Al,PKCl,Wl) in 
+	let h3l = H3(Ppub,PKCl,Wl,h2l) in
+	if ECPM(deltaCl,P) = ECPM(h2l,PA(RCl,PA(ECPM(h1l,Ppub),Wl))) then
+	let NO1' = ECPM(ADD(xi,di),Wl) in 
+	let p1' = H5(NO1') in 
+	let k1 = function(Al,p1') in 
+	let K1 = ECPM(k1,NO1') in 
+	event endOBU(idC)
+	else 0.
+let OBU2 =
+	in(Pub,(PKi:point,FID2i:bitstring,a2i:bitstring));
+	new uO2:bitstring;
+	let UO2 = ECPM(uO2,P) in
+	new TO2:bitstring;
+	let MO2 = CONCAT(FID2i,CONCAT(a2i,CONCAT(idC,Concat(UO2,TO2)))) in
+	let h22 = H2(MO2,PKi,UO2) in
+	let h32 = H3(Ppub,PKi,UO2,h22) in
+	let deltaO2 = ADD(MULT(h22,ADD(di,uO2)),MULT(h32,xi)) in
+	out(Pub,(MO2,deltaO2));
+	0.
+let OBU3 =
+	in(Pub,(PKi:point,FID3i:bitstring,a3i:bitstring));
+	new uO3:bitstring;
+	let UO3 = ECPM(uO3,P) in
+	new TO3:bitstring;
+	let MO3 = CONCAT(FID3i,CONCAT(a3i,CONCAT(idC,Concat(UO3,TO3)))) in
+	let h23 = H2(MO3,PKi,UO3) in
+	let h33 = H3(Ppub,PKi,UO3,h23) in
+	let deltaO3 = ADD(MULT(h23,ADD(di,uO3)),MULT(h33,xi)) in
+	out(Pub,(MO3,deltaO3));
+	0.
+let RSUj = 
+	in(Pub,(a1i:bitstring,FID1i:bitstring,UO1:point,MO1:bitstring,deltaO1:bitstring,a2i:bitstring,FID2i:bitstring,UO2:point,MO2:bitstring,deltaO2:bitstring,a3i:bitstring,FID3i:bitstring,UO3:point,MO3:bitstring,deltaO3:bitstring));
+	event beginRSU(idC);
+	let deltaO = ADD(deltaO1,ADD(deltaO2,deltaO3)) in 
+	let S1 = XOR(FID1i,H4(a1i)) in 
+	let S2 = XOR(FID2i,H4(a2i)) in
+	let S3 = XOR(FID3i,H4(a3i)) in
+	let SO = CONCAT(S1,CONCAT(S2,S3)) in
+	let UO = concat(UO1,concat(UO2,UO3)) in
+	new TRj:bitstring;
+	event endRSU(idC);
+	out(Pub,(deltaO,idC,SO,UO,TRj));
+	0.
+let CSl = 
+	in(Pub,(R1:point,R2:point,R3:point,S1:bitstring,S2:bitstring,S3:bitstring,UO1:point,MO1:bitstring,UO2:point,MO2:bitstring,UO3:point,MO3:bitstring,PKi:point,deltaO:bitstring,idC:bitstring,RCl:point,PKCl:point,SO:bitstring,UO:bitstring,TRj:bitstring));
+	event beginCS(IDl);
+	let h11 = H1(S1,R1,Ppub) in 
+	let h12 = H1(S2,R2,Ppub) in
+	let h13 = H1(S3,R3,Ppub) in
+	let h21 = H2(MO1,PKi,UO1) in
+	let h22 = H2(MO2,PKi,UO2) in
+	let h23 = H2(MO3,PKi,UO3) in
+	let h31 = H3(Ppub,PKi,UO1,h21) in
+	let h32 = H3(Ppub,PKi,UO2,h22) in
+	let h33 = H3(Ppub,PKi,UO3,h23) in
+	let sigma_h3R = PA(ECPM(h31,Ri),PA(ECPM(h32,Ri),ECPM(h33,Ri))) in 
+	let sigma_h2h3 = ECPM(ADD(MULT(h31,h21),ADD(MULT(h32,h22),MULT(h33,h23))),Ppub) in 
+	let sigma_h3U = PA(ECPM(h31,UO1),PA(ECPM(h32,UO2),ECPM(h33,UO3))) in 
+	let sigma_h3X = PA(ECPM(h31,Xi),PA(ECPM(h32,Xi),ECPM(h33,Xi))) in 
+	if ECPM(deltaO,P) = PA(sigma_h3R,PA(sigma_h2h3,PA(sigma_h3U,sigma_h3X))) then
+	new wl:bitstring;
+	let Wl = ECPM(wl,P) in 
+	let NO1 = ECPM(wl,PA(Xi,PA(Ri,ECPM(h11,Ppub)))) in 
+	let NO2 = ECPM(wl,PA(Xi,PA(Ri,ECPM(h12,Ppub)))) in 
+	let NO3 = ECPM(wl,PA(Xi,PA(Ri,ECPM(h13,Ppub)))) in 
+	let p1 = H5(NO1) in 
+	let p2 = H5(NO2) in 
+	let p3 = H5(NO3) in 
+	new k:bitstring;
+	new Al:bitstring;
+	let h1l = H1(IDl,RCl,Ppub) in 
+	let h2l = H2(Al,PKCl,Wl) in 
+	let h3l = H3(Ppub,PKCl,Wl,h2l) in 
+	in(Sec,(xCl:bitstring,dCl:bitstring));
+	let deltaCl = ADD(MULT(h2l,ADD(dCl,wl)),MULT(h3l,xCl)) in 
+	new TCl:bitstring;
+	event endCS(IDl);
+	out(Pub,(Wl,Al,deltaCl,TCl));
+	0.
+let ProcessOBU = OBU1 | OBU2 | OBU3.
+(*Processes Replication*)
+process 
+(!KGC | !Vi | !ProcessOBU | RSUj |!CSl)
